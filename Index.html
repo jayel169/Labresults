@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lab Scientist App</title>
+
+<!-- Libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #f4f6f8; color: #1a1a1a;
+  max-width: 900px; margin: 0 auto; padding: 16px;
+  line-height: 1.5;
+}
+header {
+  background: linear-gradient(135deg, #0d7377, #14a0a3);
+  color: white; padding: 20px; border-radius: 12px; margin-bottom: 16px;
+}
+header h1 { font-size: 20px; margin-bottom: 4px; }
+header p { font-size: 13px; opacity: 0.9; margin-bottom: 14px; }
+nav { display: flex; gap: 8px; flex-wrap: wrap; }
+nav button {
+  background: rgba(255,255,255,0.2); color: white; border: none;
+  padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 14px;
+}
+nav button.active { background: white; color: #0d7377; font-weight: bold; }
+
+.view { display: none; }
+.view.active { display: block; }
+
+input, select, textarea, button {
+  font-size: 15px; padding: 10px; border-radius: 6px;
+  border: 1px solid #ccc; margin: 4px 0;
+  font-family: inherit; background: white;
+}
+input, select, textarea { width: 100%; }
+textarea { font-family: ui-monospace, monospace; font-size: 13px; }
+button { cursor: pointer; background: #eaeaea; border: none; }
+button.primary {
+  background: #0d7377; color: white; font-weight: bold;
+  width: 100%; margin-top: 12px; padding: 12px;
+}
+button.primary:hover { background: #0a5c5f; }
+button.danger { background: #dc3545; color: white; padding: 6px 10px; font-size: 13px; }
+
+.inline { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.inline input { width: auto; }
+
+.patient-form {
+  display: grid; grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 8px; margin-bottom: 12px;
+}
+@media (max-width: 600px) { .patient-form { grid-template-columns: 1fr 1fr; } }
+
+#test-list { margin-top: 12px; }
+.test-card {
+  background: white; padding: 14px; border-radius: 8px;
+  margin-bottom: 8px; cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  transition: box-shadow 0.15s;
+}
+.test-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+.test-card .code { color: #0d7377; font-weight: bold; font-size: 12px; }
+.test-card .name { font-size: 16px; margin: 4px 0; }
+.test-card .meta { font-size: 13px; color: #666; }
+
+.result-row {
+  display: grid; grid-template-columns: 2fr 1fr auto;
+  gap: 8px; margin-bottom: 6px; align-items: center;
+}
+.result-row button { width: auto; padding: 8px 12px; }
+
+#interpret-output {
+  margin-top: 20px; background: white;
+  padding: 20px; border-radius: 10px;
+  display: none; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+#interpret-output.show { display: block; }
+
+.flag {
+  padding: 2px 8px; border-radius: 4px;
+  font-weight: bold; font-size: 12px; display: inline-block;
+}
+.flag.N { background: #d4edda; color: #155724; }
+.flag.L, .flag.H { background: #fff3cd; color: #856404; }
+.flag.CL, .flag.CH { background: #f8d7da; color: #721c24; }
+
+.pattern {
+  padding: 12px; margin: 10px 0; border-radius: 6px;
+  border-left: 4px solid #0d7377; background: #e7f3ff;
+}
+.pattern.warning { background: #fff3cd; border-left-color: #856404; }
+.pattern.info    { background: #e7f3ff; border-left-color: #0d7377; }
+.pattern.normal  { background: #d4edda; border-left-color: #155724; }
+.pattern strong { display: block; margin-bottom: 4px; }
+.pattern small { color: #666; font-style: italic; }
+
+.results-table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+.results-table th, .results-table td {
+  text-align: left; padding: 8px; border-bottom: 1px solid #eee; font-size: 14px;
+}
+.results-table th { background: #f8f9fa; }
+
+.disclaimer {
+  font-size: 12px; color: #888;
+  margin-top: 16px; font-style: italic;
+  padding: 10px; background: #f8f9fa; border-radius: 6px;
+}
+
+.editor-form label { font-size: 13px; color: #555; margin-top: 10px; display: block; font-weight: 600; }
+#custom-rules { margin-top: 12px; }
+.custom-rule {
+  background: white; padding: 12px; border-radius: 6px;
+  margin-bottom: 8px; border-left: 4px solid #0d7377;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.custom-rule .name { font-weight: bold; }
+.custom-rule .meta { font-size: 12px; color: #666; margin-top: 4px; }
+
+.modal-bg {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  display: none; align-items: center; justify-content: center; padding: 20px; z-index: 100;
+}
+.modal-bg.show { display: flex; }
+.modal {
+  background: white; border-radius: 10px; padding: 24px;
+  max-width: 600px; width: 100%; max-height: 80vh; overflow-y: auto;
+}
+.modal h2 { color: #0d7377; margin-bottom: 8px; }
+.modal .close { float: right; cursor: pointer; font-size: 22px; color: #999; }
+.modal table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+.modal table td { padding: 6px 0; border-bottom: 1px solid #eee; font-size: 14px; }
+.modal table td:first-child { color: #666; width: 35%; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🧪 Lab Scientist App</h1>
+  <p>Test library • Reference ranges • SOPs • Result interpretation</p>
+  <nav>
+    <button data-view="tests" class="active">Tests</button>
+    <button data-view="interpret">Interpret</button>
+    <button data-view="upload">Upload Report</button>
+    <button data-view="editor">Rule Editor</button>
+  </nav>
+</header>
+
+<main>
+  <!-- TESTS -->
+  <section id="view-tests" class="view active">
+    <input type="text" id="search" placeholder="Search tests (e.g. Hemoglobin, HGB)..." />
+    <div id="test-list"></div>
+  </section>
+
+  <!-- INTERPRET -->
+  <section id="view-interpret" class="view">
+    <h2 style="margin-bottom:8px;">Patient & Results</h2>
+    <div class="patient-form">
+      <input type="text" id="p-name" placeholder="Patient name" />
+      <input type="number" id="p-age" placeholder="Age" />
+      <select id="p-sex">
+        <option value="M">Male</option>
+        <option value="F">Female</option>
+      </select>
+      <label class="inline">
+        <input type="checkbox" id="p-pregnant" /> Pregnant
+      </label>
+    </div>
+
+    <div id="result-rows"></div>
+    <button id="add-row">+ Add Result</button>
+    <button id="interpret-btn" class="primary">Interpret</button>
+
+    <div id="interpret-output"></div>
+  </section>
+
+  <!-- UPLOAD -->
+  <section id="view-upload" class="view">
+    <h2 style="margin-bottom:8px;">Upload Lab Report</h2>
+    <p style="color:#666; font-size:14px; margin-bottom:12px;">
+      Upload a PDF lab report. Values are auto-detected from the text.
+    </p>
+    <input type="file" id="pdf-upload" accept=".pdf" />
+    <div id="upload-output"></div>
+  </section>
+
+  <!-- EDITOR -->
+  <section id="view-editor" class="view">
+    <h2 style="margin-bottom:8px;">Rule Editor</h2>
+    <p style="color:#666; font-size:14px; margin-bottom:12px;">
+      Add custom interpretation rules. Saved in your browser (localStorage).
+    </p>
+
+    <div class="editor-form">
+      <label>Rule name</label>
+      <input type="text" id="rule-name" placeholder="e.g. Severe hyperkalemia" />
+
+      <label>Severity</label>
+      <select id="rule-severity">
+        <option value="warning">warning</option>
+        <option value="info">info</option>
+        <option value="normal">normal</option>
+      </select>
+
+      <label>Condition (JavaScript — use v("CODE") for values, patient for info)</label>
+      <textarea id="rule-condition" rows="3" placeholder='v("K") > 6.0'></textarea>
+
+      <label>Detail (what it means)</label>
+      <textarea id="rule-detail" rows="2" placeholder="Potassium is critically high."></textarea>
+
+      <label>Reasoning (source / why)</label>
+      <textarea id="rule-reasoning" rows="2" placeholder="K > 6.0 mmol/L risks arrhythmia."></textarea>
+
+      <button id="save-rule" class="primary">Save Rule</button>
+    </div>
+
+    <h3 style="margin-top:20px;">Your Custom Rules</h3>
+    <div id="custom-rules"></div>
+  </section>
+</main>
+
+<!-- MODAL -->
+<div class="modal-bg" id="modal-bg">
+  <div class="modal">
+    <span class="close" onclick="closeModal()">&times;</span>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   1. TEST LIBRARY
+   ============================================================ */
+const TESTS = [
+  { code:"HGB", name:"Hemoglobin", category:"Hematology",
+    specimen:"Whole blood (EDTA)", method:"Automated impedance",
+    unit:"g/dL", sop:"Mix gently. Run on analyzer. Verify QC.",
+    description:"Oxygen-carrying protein in RBCs.",
+    ranges:[
+      { sex:"M", ageMin:18, low:13.0, high:17.0, criticalLow:7.0 },
+      { sex:"F", ageMin:18, low:12.0, high:15.0, criticalLow:7.0 },
+      { sex:"F", pregnant:true, low:11.0, high:14.0, criticalLow:7.0 },
+      { sex:"any", ageMax:17, low:11.5, high:15.5 }
+    ]},
+  { code:"HCT", name:"Hematocrit", category:"Hematology",
+    specimen:"Whole blood (EDTA)", method:"Calculated", unit:"%",
+    sop:"Auto-calculated from RBC and MCV.",
+    description:"Percentage of blood volume occupied by RBCs.",
+    ranges:[{ sex:"M", low:40, high:52 }, { sex:"F", low:36, high:48 }]},
+  { code:"MCV", name:"Mean Corpuscular Volume", category:"Hematology",
+    specimen:"Whole blood (EDTA)", method:"Calculated", unit:"fL",
+    sop:"Auto-calculated.", description:"Average RBC size.",
+    ranges:[{ sex:"any", low:80, high:100 }]},
+  { code:"MCH", name:"Mean Corpuscular Hemoglobin", category:"Hematology",
+    specimen:"Whole blood (EDTA)", method:"Calculated", unit:"pg",
+    sop:"Auto-calculated.", description:"Average Hb per RBC.",
+    ranges:[{ sex:"any", low:27, high:33 }]},
+  { code:"WBC", name:"White Blood Cell Count", category:"Hematology",
+    specimen:"Whole blood (EDTA)", method:"Automated impedance",
+    unit:"10^3/µL", sop:"Mix sample. Run analyzer.",
+    description:"Immune cell count.",
+    ranges:[{ sex:"any", low:4.0, high:11.0, criticalLow:2.0, criticalHigh:30.0 }]},
+  { code:"PLT", name:"Platelet Count", category:"Hematology",
+    specimen:"Whole blood (EDTA)", method:"Automated impedance",
+    unit:"10^3/µL", sop:"Mix sample. Run analyzer.",
+    description:"Clotting cell count.",
+    ranges:[{ sex:"any", low:150, high:400, criticalLow:50, criticalHigh:1000 }]},
+  { code:"NEUT", name:"Neutrophils", category:"Hematology",
+    specimen:"Whole blood (EDTA)", method:"Differential", unit:"%",
+    sop:"Run differential.", description:"Bacterial infection fighters.",
+    ranges:[{ sex:"any", low:40, high:70 }]},
+  { code:"LYMPH", name:"Lymphocytes", category:"Hematology",
+    specimen:"Whole blood (EDTA)", method:"Differential", unit:"%",
+    sop:"Run differential.", description:"Viral immunity cells.",
+    ranges:[{ sex:"any", low:20, high:45 }]},
+
+  { code:"AST", name:"Aspartate Aminotransferase", category:"Chemistry",
+    specimen:"Serum", method:"Enzymatic", unit:"U/L",
+    sop:"Run on chemistry analyzer.", description:"Liver enzyme.",
+    ranges:[{ sex:"any", low:0, high:40 }]},
+  { code:"ALT", name:"Alanine Aminotransferase", category:"Chemistry",
+    specimen:"Serum", method:"Enzymatic", unit:"U/L",
+    sop:"Run on analyzer.", description:"Liver enzyme.",
+    ranges:[{ sex:"M", low:0, high:41 }, { sex:"F", low:0, high:33 }]},
+  { code:"ALP", name:"Alkaline Phosphatase", category:"Chemistry",
+    specimen:"Serum", method:"Enzymatic", unit:"U/L",
+    sop:"Run on analyzer.", description:"Bile duct & bone enzyme.",
+    ranges:[{ sex:"any", low:40, high:120 }]},
+  { code:"BILI_T", name:"Total Bilirubin", category:"Chemistry",
+    specimen:"Serum", method:"Colorimetric", unit:"mg/dL",
+    sop:"Protect from light.", description:"Hemoglobin breakdown product.",
+    ranges:[{ sex:"any", low:0.1, high:1.2, criticalHigh:15 }]},
+  { code:"ALB", name:"Albumin", category:"Chemistry",
+    specimen:"Serum", method:"Colorimetric", unit:"g/dL",
+    sop:"Run on analyzer.", description:"Main blood protein.",
+    ranges:[{ sex:"any", low:3.5, high:5.0 }]},
+
+  { code:"CREA", name:"Creatinine", category:"Chemistry",
+    specimen:"Serum", method:"Enzymatic", unit:"mg/dL",
+    sop:"Run on analyzer.", description:"Kidney function marker.",
+    ranges:[{ sex:"M", low:0.7, high:1.3 }, { sex:"F", low:0.6, high:1.1 }]},
+  { code:"UREA", name:"Urea", category:"Chemistry",
+    specimen:"Serum", method:"Enzymatic", unit:"mg/dL",
+    sop:"Run on analyzer.", description:"Kidney function marker.",
+    ranges:[{ sex:"any", low:7, high:20 }]},
+  { code:"UA", name:"Uric Acid", category:"Chemistry",
+    specimen:"Serum", method:"Enzymatic", unit:"mg/dL",
+    sop:"Run on analyzer.", description:"Purine metabolism product.",
+    ranges:[{ sex:"M", low:3.4, high:7.0 }, { sex:"F", low:2.4, high:6.0 }]},
+
+  { code:"NA", name:"Sodium", category:"Chemistry",
+    specimen:"Serum", method:"ISE", unit:"mmol/L",
+    sop:"Run on analyzer.", description:"Main extracellular cation.",
+    ranges:[{ sex:"any", low:135, high:145, criticalLow:120, criticalHigh:160 }]},
+  { code:"K", name:"Potassium", category:"Chemistry",
+    specimen:"Serum", method:"ISE", unit:"mmol/L",
+    sop:"Avoid hemolysis.", description:"Main intracellular cation.",
+    ranges:[{ sex:"any", low:3.5, high:5.1, criticalLow:2.5, criticalHigh:6.5 }]},
+  { code:"CL", name:"Chloride", category:"Chemistry",
+    specimen:"Serum", method:"ISE", unit:"mmol/L",
+    sop:"Run on analyzer.", description:"Main extracellular anion.",
+    ranges:[{ sex:"any", low:98, high:107 }]},
+  { code:"HCO3", name:"Bicarbonate", category:"Chemistry",
+    specimen:"Serum", method:"Enzymatic", unit:"mmol/L",
+    sop:"Run on analyzer.", description:"Acid-base buffer.",
+    ranges:[{ sex:"any", low:22, high:29, criticalLow:10, criticalHigh:40 }]},
+  { code:"CA", name:"Calcium", category:"Chemistry",
+    specimen:"Serum", method:"Colorimetric", unit:"mg/dL",
+    sop:"Run on analyzer.", description:"Bone & muscle function.",
+    ranges:[{ sex:"any", low:8.5, high:10.5, criticalLow:6.5, criticalHigh:13 }]},
+  { code:"MG", name:"Magnesium", category:"Chemistry",
+    specimen:"Serum", method:"Colorimetric", unit:"mg/dL",
+    sop:"Run on analyzer.", description:"Enzyme cofactor.",
+    ranges:[{ sex:"any", low:1.7, high:2.2 }]},
+
+  { code:"GLU", name:"Fasting Glucose", category:"Chemistry",
+    specimen:"Fluoride oxalate plasma", method:"Hexokinase", unit:"mg/dL",
+    sop:"8-hour fast required.", description:"Blood sugar.",
+    ranges:[{ sex:"any", low:70, high:100, criticalLow:40, criticalHigh:400 }]},
+  { code:"HBA1C", name:"HbA1c", category:"Chemistry",
+    specimen:"Whole blood (EDTA)", method:"HPLC", unit:"%",
+    sop:"Run on analyzer.", description:"3-month glucose average.",
+    ranges:[{ sex:"any", low:4.0, high:5.6 }]},
+
+  { code:"CHOL", name:"Total Cholesterol", category:"Lipids",
+    specimen:"Serum", method:"Enzymatic", unit:"mg/dL",
+    sop:"12-hour fast.", description:"Total cholesterol.",
+    ranges:[{ sex:"any", low:0, high:200 }]},
+  { code:"TG", name:"Triglycerides", category:"Lipids",
+    specimen:"Serum", method:"Enzymatic", unit:"mg/dL",
+    sop:"12-hour fast.", description:"Blood fat.",
+    ranges:[{ sex:"any", low:0, high:150 }]},
+  { code:"HDL", name:"HDL Cholesterol", category:"Lipids",
+    specimen:"Serum", method:"Direct", unit:"mg/dL",
+    sop:"Run on analyzer.", description:"Good cholesterol.",
+    ranges:[{ sex:"M", low:40, high:100 }, { sex:"F", low:50, high:100 }]},
+  { code:"LDL", name:"LDL Cholesterol", category:"Lipids",
+    specimen:"Serum", method:"Calculated", unit:"mg/dL",
+    sop:"Calculated from other lipids.", description:"Bad cholesterol.",
+    ranges:[{ sex:"any", low:0, high:100 }]},
+
+  { code:"TSH", name:"Thyroid Stimulating Hormone", category:"Endocrine",
+    specimen:"Serum", method:"Immunoassay", unit:"mIU/L",
+    sop:"Run immunoassay.", description:"Pituitary thyroid signal.",
+    ranges:[{ sex:"any", low:0.4, high:4.0 }]},
+  { code:"FT4", name:"Free T4", category:"Endocrine",
+    specimen:"Serum", method:"Immunoassay", unit:"ng/dL",
+    sop:"Run immunoassay.", description:"Active thyroid hormone.",
+    ranges:[{ sex:"any", low:0.8, high:1.8 }]},
+  { code:"FT3", name:"Free T3", category:"Endocrine",
+    specimen:"Serum", method:"Immunoassay", unit:"pg/mL",
+    sop:"Run immunoassay.", description:"Active thyroid hormone.",
+    ranges:[{ sex:"any", low:2.3, high:4.2 }]},
+
+  { code:"TROP_I", name:"Troponin I", category:"Cardiac",
+    specimen:"Serum", method:"Immunoassay", unit:"ng/mL",
+    sop:"Run STAT.", description:"Heart muscle damage marker.",
+    ranges:[{ sex:"any", low:0, high:0.04, criticalHigh:0.5 }]},
+  { code:"CK_MB", name:"CK-MB", category:"Cardiac",
+    specimen:"Serum", method:"Immunoassay", unit:"ng/mL",
+    sop:"Run STAT.", description:"Heart muscle enzyme.",
+    ranges:[{ sex:"any", low:0, high:5 }]},
+
+  { code:"CRP", name:"C-Reactive Protein", category:"Immunology",
+    specimen:"Serum", method:"Immunoturbidimetry", unit:"mg/L",
+    sop:"Run on analyzer.", description:"Inflammation marker.",
+    ranges:[{ sex:"any", low:0, high:5 }]},
+  { code:"ESR", name:"Erythrocyte Sedimentation Rate", category:"Immunology",
+    specimen:"Whole blood (citrate)", method:"Westergren", unit:"mm/hr",
+    sop:"Run within 2 hours.", description:"Inflammation marker.",
+    ranges:[{ sex:"M", low:0, high:15 }, { sex:"F", low:0, high:20 }]},
+
+  { code:"PT", name:"Prothrombin Time", category:"Coagulation",
+    specimen:"Citrated plasma", method:"Optical", unit:"sec",
+    sop:"Run within 4 hours.", description:"Extrinsic clotting.",
+    ranges:[{ sex:"any", low:11, high:13.5, criticalHigh:30 }]},
+  { code:"INR", name:"INR", category:"Coagulation",
+    specimen:"Citrated plasma", method:"Calculated", unit:"ratio",
+    sop:"Calculated from PT.", description:"Warfarin monitoring.",
+    ranges:[{ sex:"any", low:0.8, high:1.2, criticalHigh:5.0 }]},
+  { code:"APTT", name:"Activated Partial Thromboplastin Time", category:"Coagulation",
+    specimen:"Citrated plasma", method:"Optical", unit:"sec",
+    sop:"Run within 4 hours.", description:"Intrinsic clotting.",
+    ranges:[{ sex:"any", low:25, high:35 }]},
+
+  { code:"FER", name:"Ferritin", category:"Chemistry",
+    specimen:"Serum", method:"Immunoassay", unit:"ng/mL",
+    sop:"Run immunoassay.", description:"Iron storage protein.",
+    ranges:[{ sex:"M", low:30, high:400 }, { sex:"F", low:15, high:150 }]},
+  { code:"IRON", name:"Serum Iron", category:"Chemistry",
+    specimen:"Serum", method:"Colorimetric", unit:"µg/dL",
+    sop:"Run on analyzer.", description:"Circulating iron.",
+    ranges:[{ sex:"M", low:65, high:175 }, { sex:"F", low:50, high:170 }]},
+
+  { code:"B12", name:"Vitamin B12", category:"Chemistry",
+    specimen:"Serum", method:"Immunoassay", unit:"pg/mL",
+    sop:"Run immunoassay.", description:"Nerve & blood health.",
+    ranges:[{ sex:"any", low:200, high:900 }]},
+  { code:"FOLATE", name:"Folate", category:"Chemistry",
+    specimen:"Serum", method:"Immunoassay", unit:"ng/mL",
+    sop:"Protect from light.", description:"Cell division vitamin.",
+    ranges:[{ sex:"any", low:3.0, high:20 }]},
+  { code:"VITD", name:"Vitamin D (25-OH)", category:"Chemistry",
+    specimen:"Serum", method:"Immunoassay", unit:"ng/mL",
+    sop:"Run immunoassay.", description:"Bone & immune health.",
+    ranges:[{ sex:"any", low:30, high:100 }]},
+
+  { code:"U_PROT", name:"Urine Protein", category:"Urinalysis",
+    specimen:"Urine", method:"Dipstick", unit:"mg/dL",
+    sop:"Fresh sample.", description:"Protein in urine.",
+    ranges:[{ sex:"any", low:0, high:15 }]},
+  { code:"U_GLU", name:"Urine Glucose", category:"Urinalysis",
+    specimen:"Urine", method:"Dipstick", unit:"mg/dL",
+    sop:"Fresh sample.", description:"Glucose in urine.",
+    ranges:[{ sex:"any", low:0, high:15 }]},
+  { code:"U_LEU", name:"Urine Leukocytes", category:"Urinalysis",
+    specimen:"Urine", method:"Dipstick", unit:"cells/HPF",
+    sop:"Fresh sample.", description:"WBCs in urine.",
+    ranges:[{ sex:"any", low:0, high:5 }]},
+
+  { code:"MP", name:"Malaria Parasite", category:"Parasitology",
+    specimen:"Whole blood (EDTA)", method:"Microscopy/RDT", unit:"0/1",
+    sop:"Make thick & thin films.", description:"Malaria parasites.",
+    ranges:[{ sex:"any", low:0, high:0 }]}
+];
+
+/* ============================================================
+   2. INTERPRETATION ENGINE
+   ============================================================ */
+
+function flagValue(value, range) {
+  if (range.criticalLow != null && value < range.criticalLow) return "CL";
+  if (range.criticalHigh != null && value > range.criticalHigh) return "CH";
+  if (value < range.low) return "L";
+  if (value > range.high) return "H";
+  return "N";
+}
+
+function findRange(test, patient) {
+  const candidates = test.ranges.filter(r => {
+    if (r.pregnant && !patient.pregnant) return false;
+    if (r.sex !== "any" && r.sex !== patient.sex) return false;
+    if (r.ageMin != null && patient.age < r.ageMin) return false;
+    if (r.ageMax != null && patient.age > r.ageMax) return false;
+    return true;
+  });
+  candidates.sort((a, b) => {
+    const sa = (a.pregnant?2:0) + (a.ageMin!=null?1:0) + (a.sex!=="any"?1:0);
+    const sb = (b.pregnant?2:0) + (b.ageMin!=null?1:0) + (b.sex!=="any"?1:0);
+    return sb - sa;
+  });
+  return candidates[0];
+}
+
+function explainFlag(flag, value, range, test) {
+  const u = test.unit;
+  switch (flag) {
+    case "N":  return `Normal (${range.low}–${range.high} ${u}).`;
+    case "L":  return `Low. Below ${range.low} ${u}.`;
+    case "H":  return `High. Above ${range.high} ${u}.`;
+    case "CL": return `⚠️ CRITICAL LOW — notify clinician (<${range.criticalLow} ${u}).`;
+    case "CH": return `⚠️ CRITICAL HIGH — notify clinician (>${range.criticalHigh} ${u}).`;
+    default:   return "No interpretation available.";
+  }
+}
+
+function interpretPanel(values, patient) {
+  const patterns = [];
+  const v = (c) => values[c];
+  const push = (severity, title, detail, reasoning) =>
+    patterns.push({ severity, title, detail, reasoning });
+
+  // ----- HEMATOLOGY -----
+  const hgb = v("HGB"), mcv = v("MCV"), fer = v("FER");
+  const wbc = v("WBC"), plt = v("PLT"), neut = v("NEUT");
+
+  if (hgb != null && hgb < 12) {
+    push("warning", "Anemia", `Hemoglobin ${hgb} g/dL is below normal.`,
+      "WHO anemia threshold: Hgb <12 g/dL (non-pregnant women) or <13 g/dL (men).");
+    if (mcv != null && mcv < 80) {
+      push("info", "Microcytic anemia", "Small RBCs. Consider iron deficiency or thalassemia.",
+        "MCV <80 fL defines microcytosis.");
+      if (fer != null && fer < 30) {
+        push("warning", "Iron deficiency anemia likely",
+          "Low ferritin + microcytic anemia = iron deficiency.",
+          "Ferritin <30 ng/mL has ~92% sensitivity for iron deficiency (WHO).");
+      } else if (fer != null && fer >= 100) {
+        push("info", "Consider thalassemia trait",
+          "Normal ferritin with microcytosis suggests thalassemia.",
+          "Thalassemia trait shows microcytosis with normal iron stores.");
+      }
+    } else if (mcv != null && mcv > 100) {
+      push("info", "Macrocytic anemia", "Large RBCs. Check B12 and folate.",
+        "MCV >100 fL defines macrocytosis.");
+      if (v("B12") != null && v("B12") < 200) {
+        push("warning", "B12 deficiency", "Low B12 with macrocytic anemia.",
+          "B12 <200 pg/mL confirms deficiency.");
+      }
+    } else if (mcv != null) {
+      push("info", "Normocytic anemia",
+        "Consider chronic disease, acute blood loss, or hemolysis.",
+        "Normocytic anemia (MCV 80–100) has broad differential.");
+    }
+  }
+  if (hgb != null && hgb > 17) {
+    push("info", "Polycythemia", "Elevated hemoglobin. Consider dehydration or polycythemia vera.",
+      "Hgb >17 g/dL suggests polycythemia.");
+  }
+  if (wbc != null && wbc > 11) {
+    push("warning", "Leukocytosis", "Elevated WBC. Suggests infection or inflammation.",
+      "WBC >11 ×10³/µL indicates leukocytosis.");
+    if (neut != null && neut > 70) {
+      push("info", "Neutrophilia", "Suggests bacterial infection.",
+        "Neutrophils >70% suggests bacterial cause.");
+    }
+  }
+  if (wbc != null && wbc < 4) {
+    push("warning", "Leukopenia", "Low WBC. Consider viral infection or marrow suppression.",
+      "WBC <4 ×10³/µL indicates leukopenia.");
+  }
+  if (plt != null && plt < 150) {
+    push("warning", "Thrombocytopenia", "Low platelets. Bleeding risk.",
+      "PLT <150 ×10³/µL defines thrombocytopenia.");
+  }
+  if (plt != null && plt > 400) {
+    push("info", "Thrombocytosis", "High platelets. Reactive or primary.",
+      "PLT >400 ×10³/µL indicates thrombocytosis.");
+  }
+
+  // ----- LIVER -----
+  const ast = v("AST"), alt = v("ALT"), alp = v("ALP"), bili = v("BILI_T");
+  if (ast != null && alt != null && ast > 40 && alt > 40) {
+    const ratio = ast / alt;
+    push("warning", "Elevated liver enzymes",
+      `AST and ALT elevated (AST/ALT ratio ${ratio.toFixed(2)}).`,
+      ratio > 2
+        ? "AST:ALT >2 suggests alcohol-related liver injury."
+        : "AST:ALT <2 suggests viral or fatty liver.");
+  }
+  if (alp != null && bili != null && alp > 120 && bili > 1.2) {
+    push("warning", "Cholestatic pattern",
+      "Raised ALP + bilirubin suggests bile duct obstruction.",
+      "ALP and bilirubin rise together in cholestasis.");
+  }
+  if (bili != null && bili > 1.2 && bili <= 3) {
+    push("info", "Mild hyperbilirubinemia", "Slightly raised bilirubin. Often benign (Gilbert's).",
+      "Bilirubin 1.2–3 mg/dL is often benign.");
+  }
+
+  // ----- KIDNEY -----
+  const crea = v("CREA"), urea = v("UREA");
+  if (crea != null && urea != null && crea > 1.3 && urea > 20) {
+    push("warning", "Impaired kidney function",
+      "Raised creatinine and urea. Consider renal impairment.",
+      "Both rise together in reduced GFR.");
+  }
+  if (crea != null && crea > 3) {
+    push("warning", "Severe renal impairment",
+      "Creatinine >3 mg/dL — significant kidney dysfunction.",
+      "Creatinine >3 mg/dL suggests advanced CKD or AKI.");
+  }
+
+  // ----- GLUCOSE -----
+  const glu = v("GLU");
+  if (glu != null && glu >= 126) {
+    push("warning", "Diabetes range glucose",
+      "Fasting glucose ≥126 mg/dL meets diabetes criteria.",
+      "ADA: fasting glucose ≥126 mg/dL on two occasions.");
+  } else if (glu != null && glu >= 100) {
+    push("info", "Prediabetes range", "Fasting glucose 100–125 mg/dL.",
+      "ADA prediabetes range.");
+  } else if (glu != null && glu < 70) {
+    push("warning", "Hypoglycemia", "Low fasting glucose. Consider diabetes treatment or other cause.",
+      "Fasting glucose <70 mg/dL = hypoglycemia.");
+  }
+  const a1c = v("HBA1C");
+  if (a1c != null && a1c >= 6.5) {
+    push("warning", "HbA1c in diabetes range", `HbA1c ${a1c}% ≥6.5%.`,
+      "ADA: HbA1c ≥6.5% diagnoses diabetes.");
+  } else if (a1c != null && a1c >= 5.7) {
+    push("info", "HbA1c in prediabetes range", `HbA1c ${a1c}% (5.7–6.4%).`,
+      "ADA prediabetes range.");
+  }
+
+  // ----- ELECTROLYTES -----
+  const k = v("K"), na = v("NA");
+  if (k != null && k > 5.1) {
+    push(k > 6.5 ? "warning" : "info", "Hyperkalemia",
+      `Potassium ${k} mmol/L is high.`,
+      "K >5.1 mmol/L risks arrhythmia; >6.5 is critical.");
+  }
+  if (k != null && k < 3.5) {
+    push(k < 2.5 ? "warning" : "info", "Hypokalemia",
+      `Potassium ${k} mmol/L is low.`,
+      "K <3.5 mmol/L causes weakness; <2.5 is critical.");
+  }
+  if (na != null && na < 135) {
+    push(na < 125 ? "warning" : "info", "Hyponatremia",
+      `Sodium ${na} mmol/L is low.`,
+      "Na <135 mmol/L defines hyponatremia.");
+  }
+  if (na != null && na > 145) {
+    push(na > 155 ? "warning" : "info", "Hypernatremia",
+      `Sodium ${na} mmol/L is high.`,
+      "Na >145 mmol/L defines hypernatremia.");
+  }
+  const ca = v("CA");
+  if (ca != null && ca > 10.5) {
+    push(ca > 13 ? "warning" : "info", "Hypercalcemia",
+      `Calcium ${ca} mg/dL is high.`,
+      "Ca >10.5 mg/dL defines hypercalcemia.");
+  }
+  if (ca != null && ca < 8.5) {
+    push(ca < 6.5 ? "warning" : "info", "Hypocalcemia",
+      `Calcium ${ca} mg/dL is low.`,
+      "Ca <8.5 mg/dL defines hypocalcemia.");
+  }
+
+  // ----- LIPIDS -----
+  if (v("CHOL") != null && v("CHOL") > 200)
+    push("info", "High cholesterol", `Total cholesterol ${v("CHOL")} mg/dL.`,
+      "Desirable total cholesterol <200 mg/dL.");
+  if (v("LDL") != null && v("LDL") > 100)
+    push("info", "High LDL", `LDL ${v("LDL")} mg/dL.`,
+      "Optimal LDL <100 mg/dL.");
+  if (v("TG") != null && v("TG") > 150)
+    push("info", "High triglycerides", `TG ${v("TG")} mg/dL.`,
+      "Normal TG <150 mg/dL.");
+  if (v("HDL") != null && v("HDL") < 40)
+    push("info", "Low HDL", `HDL ${v("HDL")} mg/dL.`,
+      "Low HDL (<40 M, <50 F) increases CVD risk.");
+
+  // ----- THYROID -----
+  const tsh = v("TSH"), ft4 = v("FT4");
+  if (tsh != null && tsh > 4.0 && ft4 != null && ft4 < 0.8) {
+    push("warning", "Hypothyroidism",
+      "High TSH with low FT4 suggests primary hypothyroidism.",
+      "Classic pattern: TSH↑ + FT4↓.");
+  } else if (tsh != null && tsh > 4.0) {
+    push("info", "Subclinical hypothyroidism",
+      "High TSH with normal FT4.",
+      "TSH >4.0 with normal FT4 = subclinical hypothyroidism.");
+  }
+  if (tsh != null && tsh < 0.4 && ft4 != null && ft4 > 1.8) {
+    push("warning", "Hyperthyroidism",
+      "Low TSH with high FT4 suggests hyperthyroidism.",
+      "Classic pattern: TSH↓ + FT4↑.");
+  }
+
+  // ----- CARDIAC -----
+  if (v("TROP_I") != null && v("TROP_I") > 0.04) {
+    push("warning", "Elevated troponin",
+      "Troponin above cutoff — possible myocardial injury.",
+      "Troponin >0.04 ng/mL suggests myocardial damage.");
+  }
+
+  // ----- INFLAMMATION -----
+  if (v("CRP") != null && v("CRP") > 5)
+    push("info", "Elevated CRP", `CRP ${v("CRP")} mg/L.`,
+      "CRP >5 mg/L indicates inflammation.");
+  if (v("ESR") != null && v("ESR") > 20)
+    push("info", "Elevated ESR", `ESR ${v("ESR")} mm/hr.`,
+      "ESR >20 mm/hr (F) or >15 (M) indicates inflammation.");
+
+  // ----- COAGULATION -----
+  if (v("INR") != null && v("INR") > 1.2)
+    push(v("INR") > 5 ? "warning" : "info", "Elevated INR",
+      `INR ${v("INR")} — increased bleeding risk.`,
+      "INR >1.2 prolonged; >5 critical.");
+
+  // ----- URINALYSIS -----
+  if (v("U_LEU") != null && v("U_LEU") > 5)
+    push("info", "Urine leukocytes elevated",
+      "Possible urinary tract infection.",
+      "Leukocytes >5/HPF suggests UTI.");
+
+  // ----- INFECTIONS -----
+  if (v("MP") === 1)
+    push("warning", "Malaria parasites detected",
+      "Positive malaria test — treat per protocol.",
+      "Microscopy/RDT positive for Plasmodium.");
+
+  // ----- CUSTOM RULES -----
+  const customRules = JSON.parse(localStorage.getItem("customRules") || "[]");
+  for (const rule of customRules) {
+    try {
+      const fn = new Function("v", "patient", "values", `return (${rule.condition});`);
+      if (fn(v, patient, values)) {
+        push(rule.severity, rule.name, rule.detail, rule.reasoning + " (custom rule)");
+      }
+    } catch (e) { console.warn("Bad rule:", rule.name, e); }
+  }
+
+  if (patterns.length === 0)
+    push("normal", "No significant pattern",
+      "All entered values appear within expected combinations.",
+      "No pattern rules triggered.");
+
+  return patterns;
+}
+
+function generateSummary(patient, results, patterns) {
+  const criticals = results.filter(r => r.flag === "CL" || r.flag === "CH");
+  const abnormals = results.filter(r => r.flag === "L" || r.flag === "H");
+  let s = `Patient: ${patient.name || "Unknown"}, ${patient.age}y ${patient.sex}. `;
+  if (criticals.length) s += `⚠️ ${criticals.length} CRITICAL value(s) — immediate clinician review. `;
+  if (abnormals.length) s += `${abnormals.length} abnormal value(s). `;
+  else s += `All values within reference ranges. `;
+  const main = patterns.find(p => p.severity === "warning");
+  if (main) s += `Main finding: ${main.title}. `;
+  s += `Supportive interpretation only — not a diagnosis.`;
+  return s;
+}
+
+/* ============================================================
+   3. UI
+   ============================================================ */
+const $ = (id) => document.getElementById(id);
+
+document.querySelectorAll("nav button").forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll("nav button").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+    btn.classList.add("active");
+    $("view-" + btn.dataset.view).classList.add("active");
+  };
+});
+
+// ---- TESTS ----
+function renderTests(filter = "") {
+  const list = $("test-list");
+  const q = filter.toLowerCase();
+  const filtered = TESTS.filter(t =>
+    t.name.toLowerCase().includes(q) || t.code.toLowerCase().includes(q));
+  list.innerHTML = filtered.map(t => `
+    <div class="test-card" onclick="showTest('${t.code}')">
+      <div class="code">${t.code}</div>
+      <div class="name">${t.name}</div>
+      <div class="meta">${t.category} • ${t.unit}</div>
+    </div>`).join("") || "<p>No tests found.</p>";
+}
+$("search").oninput = e => renderTests(e.target.value);
+renderTests();
+
+window.showTest = function(code) {
+  const t = TESTS.find(x => x.code === code);
+  const rangesHTML = t.ranges.map(r => {
+    let label = r.sex === "any" ? "All" : r.sex;
+    if (r.ageMin != null || r.ageMax != null) label += ` (${r.ageMin||0}–${r.ageMax||"+"}y)`;
+    if (r.pregnant) label += " pregnant";
+    let range = `${r.low}–${r.high} ${t.unit}`;
+    if (r.criticalLow != null || r.criticalHigh != null)
+      range += ` | critical: ${r.criticalLow ?? "—"}–${r.criticalHigh ?? "—"}`;
+    return `<tr><td>${label}</td><td>${range}</td></tr>`;
+  }).join("");
+
+  $("modal-content").innerHTML = `
+    <h2>${t.name}</h2>
+    <div style="color:#666; font-size:13px; margin-bottom:12px;">${t.code} • ${t.category}</div>
+    <table>
+      <tr><td>Specimen</td><td>${t.specimen}</td></tr>
+      <tr><td>Method</td><td>${t.method}</td></tr>
+      <tr><td>Unit</td><td>${t.unit}</td></tr>
+      <tr><td>Description</td><td>${t.description}</td></tr>
+      <tr><td>SOP</td><td>${t.sop}</td></tr>
+    </table>
+    <h3 style="margin-top:16px; color:#0d7377;">Reference Ranges</h3>
+    <table>${rangesHTML}</table>`;
+  $("modal-bg").classList.add("show");
+};
+window.closeModal = () => $("modal-bg").classList.remove("show");
+$("modal-bg").onclick = e => { if (e.target.id === "modal-bg") closeModal(); };
+
+// ---- INTERPRET ----
+function addResultRow() {
+  const div = document.createElement("div");
+  div.className = "result-row";
+  div.innerHTML = `
+    <select class="r-code">
+      ${TESTS.map(t => `<option value="${t.code}">${t.name} (${t.code})</option>`).join("")}
+    </select>
+    <input type="number" step="0.01" class="r-val" placeholder="Value" />
+    <button class="danger" onclick="this.parentElement.remove()">×</button>`;
+  $("result-rows").appendChild(div);
+}
+$("add-row").onclick = addResultRow;
+addResultRow();
+
+$("interpret-btn").onclick = () => {
+  const patient = {
+    name: $("p-name").value || "Unknown",
+    age: parseInt($("p-age").value) || 0,
+    sex: $("p-sex").value,
+    pregnant: $("p-pregnant").checked
+  };
+
+  const values = {};
+  const results = [];
+  document.querySelectorAll(".result-row").forEach(row => {
+    const code = row.querySelector(".r-code").value;
+    const val = parseFloat(row.querySelector(".r-val").value);
+    if (isNaN(val)) return;
+    const test = TESTS.find(t => t.code === code);
+    const range = findRange(test, patient);
+    const flag = range ? flagValue(val, range) : "?";
+    values[code] = val;
+    results.push({
+      code, name: test.name, value: val, unit: test.unit, flag,
+      note: range ? explainFlag(flag, val, range, test) : "No range."
+    });
+  });
+
+  if (results.length === 0) { alert("Enter at least one value."); return; }
+
+  const patterns = interpretPanel(values, patient);
+  const summary = generateSummary(patient, results, patterns);
+  renderReport({ patient, results, patterns, summary });
+};
+
+function renderReport({ patient, results, patterns, summary }) {
+  const out = $("interpret-output");
+  out.classList.add("show");
+
+  const rowsHTML = results.map(r => `
+    <tr>
+      <td>${r.name}</td>
+      <td>${r.value} ${r.unit}</td>
+      <td><span class="flag ${r.flag}">${r.flag}</span></td>
+      <td>${r.note}</td>
+    </tr>`).join("");
+
+  const patternsHTML = patterns.map(p => `
+    <div class="pattern ${p.severity}">
+      <strong>${p.title}</strong>
+      ${p.detail}
+      <small>Why: ${p.reasoning}</small>
+    </div>`).join("");
+
+  out.innerHTML = `
+    <h3 style="color:#0d7377;">Report: ${patient.name}</h3>
+    <p style="margin:10px 0;"><strong>Summary:</strong> ${summary}</p>
+    <h4 style="margin-top:14px;">Results</h4>
+    <table class="results-table">
+      <thead><tr><th>Test</th><th>Value</th><th>Flag</th><th>Note</th></tr></thead>
+      <tbody>${rowsHTML}</tbody>
+    </table>
+    <h4 style="margin-top:14px;">Interpretation</h4>
+    ${patternsHTML}
+    <button class="primary" onclick='downloadPDF(${JSON.stringify({patient,results,patterns,summary})})'>
+      ⬇ Download PDF Report
+    </button>
+    <div class="disclaimer">
+      ⚠️ For educational/support use only. Not a diagnosis. Always consult a qualified clinician.
+    </div>`;
+}
+
+// ---- PDF ----
+window.downloadPDF = function(payload) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  let y = 15;
+  doc.setFontSize(16);
+  doc.text("Laboratory Interpretation Report", 14, y); y += 10;
+  doc.setFontSize(11);
+  doc.text(`Patient: ${payload.patient.name}`, 14, y); y += 6;
+  doc.text(`Age/Sex: ${payload.patient.age} / ${payload.patient.sex}`, 14, y); y += 10;
+  doc.setFontSize(12);
+  doc.text("Results:", 14, y); y += 7;
+  doc.setFontSize(10);
+  payload.results.forEach(r => {
+    const line = `${r.name}: ${r.value} ${r.unit} [${r.flag}]`;
+    doc.text(line, 14, y); y += 6;
+    if (y > 270) { doc.addPage(); y = 20; }
+  });
+  y += 6;
+  doc.setFontSize(12);
+  doc.text("Interpretation:", 14, y); y += 7;
+  doc.setFontSize(10);
+  payload.patterns.forEach(p => {
+    const lines = doc.splitTextToSize(`• ${p.title}: ${p.detail}`, 180);
+    doc.text(lines, 14, y); y += lines.length * 5 + 2;
+    if (y > 270) { doc.addPage(); y = 20; }
+  });
+  y += 6;
+  doc.setFontSize(8);
+  doc.text("For educational use only. Not a diagnosis.", 14, y);
+  doc.save("lab-report.pdf");
+};
+
+// ---- UPLOAD ----
+$("pdf-upload").onchange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const out = $("upload-output");
+  out.innerHTML = "<p>Reading PDF...</p>";
+  try {
+    if (!window.pdfjsLib) throw new Error("pdf.js not loaded");
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    const buffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+    let text = "";
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map(it => it.str).join(" ") + "\n";
+    }
+    // Auto-detect values
+    const detected = autoParseValues(text);
+    out.innerHTML = `
+      <h3 style="color:#0d7377; margin-top:14px;">Detected Values</h3>
+      ${detected.length
+        ? `<div style="background:#e7f3ff; padding:12px; border-radius:6px;">
+             ${detected.map(d => `<div>✓ ${d.name} (${d.code}): <strong>${d.value}</strong></div>`).join("")}
+           </div>
+           <button class="primary" onclick='loadDetected(${JSON.stringify(detected)})'>
+             Load ${detected.length} values into Interpreter
+           </button>`
+        : "<p>No recognizable values found. Try a different PDF.</p>"}
+      <details style="margin-top:14px;">
+        <summary style="cursor:pointer; color:#0d7377;">Raw extracted text</summary>
+        <pre style="white-space:pre-wrap; background:#f9f9f9; padding:12px; border-radius:6px; margin-top:8px; font-size:12px;">${text.slice(0, 3000)}</pre>
+      </details>`;
+  } catch (err) {
+    out.innerHTML = `<p style="color:#dc3545;">Error reading PDF: ${err.message}</p>`;
+  }
+};
+
+function autoParseValues(text) {
+  const detected = [];
+  const seen = new Set();
+  for (const test of TESTS) {
+    // Try code match first, then name match
+    const patterns = [
+      new RegExp(`\\b${test.code}\\b[^\\d\\-]{0,30}?(\\d+\\.?\\d*)`, "i"),
+      new RegExp(`${test.name}[^\\d\\-]{0,30}?(\\d+\\.?\\d*)`, "i")
+    ];
+    for (const re of patterns) {
+      const m = text.match(re);
+      if (m && !seen.has(test.code)) {
+        const val = parseFloat(m[1]);
+        if (!isNaN(val)) {
+          detected.push({ code: test.code, name: test.name, value: val });
+          seen.add(test.code);
+          break;
+        }
+      }
+    }
+  }
+  return detected;
+}
+
+window.loadDetected = function(detected) {
+  // Clear existing rows
+  $("result-rows").innerHTML = "";
+  detected.forEach(d => {
+    const div = document.createElement("div");
+    div.className = "result-row";
+    div.innerHTML = `
+      <select class="r-code">
+        ${TESTS.map(t => `<option value="${t.code}" ${t.code===d.code?"selected":""}>${t.name} (${t.code})</option>`).join("")}
+      </select>
+      <input type="number" step="0.01" class="r-val" value="${d.value}" />
+      <button class="danger" onclick="this.parentElement.remove()">×</button>`;
+    $("result-rows").appendChild(div);
+  });
+  // Switch to interpret view
+  document.querySelectorAll("nav button").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+  document.querySelector('nav button[data-view="interpret"]').classList.add("active");
+  $("view-interpret").classList.add("active");
+  alert(`Loaded ${detected.length} values. Review and click Interpret.`);
+};
+
+// ---- RULE EDITOR ----
+$("save-rule").onclick = () => {
+  const rule = {
+    name: $("rule-name").value.trim(),
+    severity: $("rule-severity").value,
+    condition: $("rule-condition").value.trim(),
+    detail: $("rule-detail").value.trim(),
+    reasoning: $("rule-reasoning").value.trim()
+  };
+  if (!rule.name || !rule.condition || !rule.detail) {
+    alert("Please fill in name, condition, and detail.");
+    return;
+  }
+  // Validate the condition compiles
+  try {
+    new Function("v", "patient", "values", `return (${rule.condition});`);
+  } catch (e) {
+    alert("Condition has a syntax error: " + e.message);
+    return;
+  }
+  const rules = JSON.parse(localStorage.getItem("customRules") || "[]");
+  rules.push(rule);
+  localStorage.setItem("customRules", JSON.stringify(rules));
+  $("rule-name").value = "";
+  $("rule-condition").value = "";
+  $("rule-detail").value = "";
+  $("rule-reasoning").value = "";
+  renderCustomRules();
+};
+
+function renderCustomRules() {
+  const rules = JSON.parse(localStorage.getItem("customRules") || "[]");
+  $("custom-rules").innerHTML = rules.length
+    ? rules.map((r, i) => `
+        <div class="custom-rule">
+          <div class="name">${r.name} <span class="flag ${r.severity==='warning'?'CH':r.severity==='normal'?'N':'L'}">${r.severity}</span></div>
+          <div class="meta">Condition: <code>${r.condition}</code></div>
+          <div class="meta">Detail: ${r.detail}</div>
+          <div class="meta">Reasoning: ${r.reasoning}</div>
+          <button class="danger" style="margin-top:6px;" onclick="deleteRule(${i})">Delete</button>
+        </div>`).join("")
+    : "<p style='color:#666;'>No custom rules yet.</p>";
+}
+
+window.deleteRule = (i) => {
+  const rules = JSON.parse(localStorage.getItem("customRules") || "[]");
+  rules.splice(i, 1);
+  localStorage.setItem("customRules", JSON.stringify(rules));
+  renderCustomRules();
+};
+
+renderCustomRules();
+</script>
+</body>
+</html>
